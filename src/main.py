@@ -1,5 +1,4 @@
 import json
-import os
 import sys
 import numpy as np
 import time
@@ -10,8 +9,9 @@ from PyQt5.QtCore import Qt
 import draw
 import threading
 import FileWriter
+import handsim
 import subprocess
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtWidgets
 
 N_PASSES = 1 # number of dropped frames for 1 drawing
 DRAW_BUFFER_SIZE = 25 # it's 20 fps if n_passes = 1
@@ -89,9 +89,10 @@ class DataThread(threading.Thread):
 
     data_running = True
 
-    def __init__(self, canvas):
+    def __init__(self, canvas, window):
         super(DataThread, self).__init__()
         self.canvas = canvas
+        self.window = window
         self.file_writer = FileWriter.FileWriter()
 
     def stop_data(self):
@@ -159,6 +160,8 @@ class DataThread(threading.Thread):
 
                                     if db_len == DRAW_BUFFER_SIZE:
                                         self.canvas.feed_data(draw_buffer, DRAW_BUFFER_SIZE)
+                                        self.canvas.update()
+                                        self.window.handsim_view.update()
                                         db_len = 0
 
                                     i_pass = 0
@@ -219,26 +222,30 @@ class Tabs(QtWidgets.QTabWidget):
     def __init__(self):
         super(Tabs, self).__init__()
         self.all_tabs = []
+        self.handsim_view = handsim.create_hand_sim_widget()
         self.build_widgets()
 
     def build_widgets(self):
+        self.all_tabs.append(self.handsim_view)
+        self.addTab(self.all_tabs[0], 'Sim')
+        self.all_tabs.append(QtWidgets.QWidget())
+        self.addTab(self.all_tabs[1], 'Fixed')
+        self.all_tabs.append(QtWidgets.QWidget())
+        self.addTab(self.all_tabs[2], 'Keyboard')
+        self.all_tabs.append(QtWidgets.QWidget())
+        self.addTab(self.all_tabs[3], 'Сontinuous')
 
-        self.all_tabs.append(QtWidgets.QWidget())
-        self.addTab(self.all_tabs[0], 'Fixed')
-        self.all_tabs.append(QtWidgets.QWidget())
-        self.addTab(self.all_tabs[1], 'Keyboard')
-        self.all_tabs.append(QtWidgets.QWidget())
-        self.addTab(self.all_tabs[2], 'Сontinuous')
 
-    def create_tab(self):
-        self.all_tabs.append(QtWidgets.QWidget())
-        self.addTab(self.all_tabs[len(self.all_tabs) - 1],
-                    'Tab {}'.format(len(self.all_tabs)))
+#    def create_tab(self):
+#        self.all_tabs.append(QtWidgets.QWidget())
+#        self.addTab(self.all_tabs[len(self.all_tabs) - 1],
+#                    'Tab {}'.format(len(self.all_tabs)))
 
     def close_tab(self, index):
         widget = self.widget(index)
         widget.deleteLater()
         self.removeTab(index)
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -252,7 +259,6 @@ class MainWindow(QMainWindow):
         self.myo_canvas = draw.Canvas()
         self.myo_canvas.native.setParent(window)
 
-
         self.btnStart = QtWidgets.QPushButton("Start data")
         self.btnStop = QtWidgets.QPushButton("Stop data")
         vbox.addWidget(self.btnStart)
@@ -264,14 +270,16 @@ class MainWindow(QMainWindow):
         self.node_proc = None
 
         self.tabs = Tabs()
+        self.handsim_view = self.tabs.handsim_view
         splitter1 = QSplitter(Qt.Horizontal)
         splitter1.addWidget(self.tabs)
         splitter1.addWidget(window)
+        splitter1.setSizes([70, 30])
 
         self.setCentralWidget(splitter1)
 
     def on_start(self):
-        self.node_proc = subprocess.Popen(["node", "index.js"])
+        self.node_proc = subprocess.Popen(["node", "../index.js"])
 
     def on_stop(self):
         if None is not self.node_proc:
@@ -283,7 +291,7 @@ class MainWindow(QMainWindow):
 def main(argv):
     appQt = QApplication(sys.argv)
     window = MainWindow()
-    window.myo_canvas.thread = DataThread(window.myo_canvas)
+    window.myo_canvas.thread = DataThread(window.myo_canvas, window)
     window.myo_canvas.thread.start()
     window.setWindowTitle("Starting and stopping the process")
     window.show()

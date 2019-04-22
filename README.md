@@ -5,7 +5,7 @@
       * Windows : npm requires VS c++ build tools https://visualstudio.microsoft.com/visual-cpp-build-tools/
     * `node index.js`
 * Start the visualization
-    * `python3 -m pip install pyqt5`
+    * `cd src`
     * `python3 setup.py install`
       * Mac OS : probably you'll need to execute `python3 -m pip install pyzmq`
     * `python3 main.py`
